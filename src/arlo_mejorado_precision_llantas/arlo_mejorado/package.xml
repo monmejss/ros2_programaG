@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>arlo_mejorado</name>
+  <version>1.0.0</version>
+  <description>An example of how to build a differential drive in Gazebo with ROS 2 support</description>
+
+  <maintainer email="tonio.jaimes@gmail.com">Antonio</maintainer>
+  <license>TODO</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+  <depend>rclcpp</depend>
+  <depend>gazebo_ros</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
