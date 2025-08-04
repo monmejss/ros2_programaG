@@ -7,7 +7,7 @@ import numpy as np
 from geometry_msgs.msg import Twist
 from sensor_msgs.msg import LaserScan
 from math import isinf
-#import message_filters
+import message_filters
 from numpy import linalg as LA
 import math
 

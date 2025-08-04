@@ -75,7 +75,7 @@ class GeneticProgramNode(Node):
         # save gp to file
         f.close()
         with open ('gp.dat', 'wb') as gpFile:
-            pickle.dump(gp, gpFile )
+            pickle.dump(self.gp, gpFile)
             print('GP saved to gp.dat')
             
     def handleEvaluateTree(self, request, response):
