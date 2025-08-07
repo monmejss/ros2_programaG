@@ -10,6 +10,7 @@ from math import isinf
 import message_filters
 from numpy import linalg as LA
 import math
+import time
 
 
 #sensores
@@ -197,7 +198,7 @@ def controlarRobotObstaculo(node):
    global rangosR
 
    pubVel = node.create_publisher(Twist, '/cmd_vel', 10)
-   rate = rclpy.Rate(2, node.context)
+   time.sleep(0.5)
 
    t = 0
    t2 = 0
@@ -300,7 +301,7 @@ def controlarRobot(node):
    global rangosR
    pubVel = node.create_publisher(Twist, '/cmd_vel', 10)   
    vel_msg = Twist()
-   rate = rclpy.Rate(50, node.context)
+   time.sleep(0.5)
 
    while rclpy.ok():
     if(isinf(rangosF[16])):
@@ -332,16 +333,25 @@ def controlarRobot(node):
 
     pubVel.publish(vel_msg)
     print(f"Vl: {vel_msg.linear.x}, Va: {vel_msg.angular.z}")
-    rate.sleep()
+    time.sleep(0.02)  # 50 Hz en vez de rclpy.Rate
 
 
 def turnLeft(node):
-    scanner_center = message_filters.Subscriber(node, LaserScan, '/arlo/laser/scan_center')
-    scanner_left = message_filters.Subscriber(node, LaserScan, '/arlo/laser/scan_left')
-    scanner_right = message_filters.Subscriber(node, LaserScan, '/arlo/laser/scan_right')
-    ts = message_filters.TimeSynchronizer([scanner_center, scanner_left, scanner_right], 10)
-    ts.registerCallback(callback)
-    controlarRobot(node)
+    pubVel = node.create_publisher(Twist, '/cmd_vel', 10)
+    vel_msg = Twist()
+
+    # Gira hacia la izquierda en el lugar
+    vel_msg.linear.x = 0.0
+    vel_msg.angular.z = 0.5
+
+    # Mantener giro durante 1 segundo
+    for _ in range(10):
+        pubVel.publish(vel_msg)
+        time.sleep(0.1)
+
+    # Detener después del giro
+    vel_msg.angular.z = 0.0
+    pubVel.publish(vel_msg)
 
 
 def main():

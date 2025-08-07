@@ -48,4 +48,3 @@ class Node:
         copy.value =self.value
         return copy
 
-

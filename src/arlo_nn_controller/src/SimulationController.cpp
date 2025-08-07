@@ -61,8 +61,9 @@
       std::bind(&SimulationController::evaluateDriver, this,
                   std::placeholders::_1, std::placeholders::_2));
 
-   // Cliente de servicio
+   
     actuatorClient_ = this->create_client<arlo_interfaces::srv::EvaluateTree>("evaluate_tree");
+    // Cliente de servicio de /reset_simulation 
     reset_sim_client_ = this->create_client<std_srvs::srv::Empty>("/reset_simulation");
     RCLCPP_INFO(this->get_logger(), "SimulationController inicializado");
  }
@@ -83,13 +84,15 @@
    const std::shared_ptr<arlo_nn_controller::srv::EvaluateDriver::Request> req,
    std::shared_ptr<arlo_nn_controller::srv::EvaluateDriver::Response> res)
 {
-   RCLCPP_INFO(this->get_logger(), "Llamada recibida en evaluateDriver: maxtime=%ld, tree_index=%ld", 
-   req->maxtime, req->tree_index);
+   RCLCPP_INFO(this->get_logger(), "[C++] Recibida petición evaluate_driver:");
+   RCLCPP_INFO(this->get_logger(), "        maxtime=%ld, tree_index=%ld",
+                req->maxtime, req->tree_index);
 
    startSimulation(req->maxtime, req->tree_index);
 
    res->time = arloState.finishTime;
    res->dist2go = arloState.distanceToGo;
+   RCLCPP_INFO(this->get_logger(), "[C++] Enviando respuesta dist2go=%f",  res->dist2go);
    res->damage = arloState.robotDamage;
    res->energy = arloState.robotEnergy;
 
@@ -105,17 +108,35 @@
     RCLCPP_INFO(this->get_logger(), "Starting the simulation of a new driver...");
     RCLCPP_INFO(this->get_logger(), "---------------------------");
 
-    // Esperar y llamar a reset_simulation
+    /*std_srvs::Empty gazeboParams;
+      ros::service::call("/gazebo/reset_simulation", gazeboParams);*/
     while (!reset_sim_client_->wait_for_service(std::chrono::seconds(1))) {
+      RCLCPP_ERROR(this->get_logger(), "Prueba DENTRO DEL WHILE");
         if (!rclcpp::ok()) {
-            RCLCPP_ERROR(this->get_logger(), "ROS apagándose mientras esperaba /reset_simulation");
+            RCLCPP_ERROR(this->get_logger(), "Esperando /reset_simulation");
             return arloState;
         }
         RCLCPP_INFO(this->get_logger(), "Esperando servicio /reset_simulation...");
     }
+    RCLCPP_ERROR(this->get_logger(), "Prueba FUERA DEL WHILE");
+    // crear solicitud 
     auto reset_req = std::make_shared<std_srvs::srv::Empty::Request>();
+    // llamar al servicio
     auto reset_future = reset_sim_client_->async_send_request(reset_req);
-    reset_future.wait_for(std::chrono::seconds(5)); // Espera hasta 5 segundos
+    auto status = reset_future.wait_for(std::chrono::seconds(15));
+    if (status == std::future_status::ready) {
+         try {
+            auto response = reset_future.get();  // <-- obtienes respuesta
+            RCLCPP_INFO(this->get_logger(), "✅ Servicio /reset_simulation ejecutado correctamente.");
+         } catch (const std::exception &e) {
+            RCLCPP_ERROR(this->get_logger(), "❌ Excepción al obtener la respuesta del servicio: %s", e.what());
+            return arloState;
+         }
+   } else {
+         RCLCPP_ERROR(this->get_logger(), "Fallo al llamar al servicio /reset_simulation (timeout).");
+         return arloState;
+  }
+  
 
     maxSimTime = maxtime;
     rclcpp::Rate loop_rate(50);
@@ -124,6 +145,7 @@
     stuckCounter = 0;
 
     while (rclcpp::ok() && !arloState.hasTimeRunOut && !arloState.finishLineCrossed) {
+
         // Esperar servicio evaluate_tree
         while (!actuatorClient_->wait_for_service(std::chrono::seconds(1))) {
             if (!rclcpp::ok()) {
@@ -139,7 +161,7 @@
             eval_req->sensor_values[i] = sensorValues[i];
         }
         eval_req->tree_index = tree_index;
-
+      // AQUI OTRO
         auto eval_future = actuatorClient_->async_send_request(eval_req);
         if (eval_future.wait_for(std::chrono::seconds(5)) == std::future_status::ready) {
             auto response = eval_future.get();
