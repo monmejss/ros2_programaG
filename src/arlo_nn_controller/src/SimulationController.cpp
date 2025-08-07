@@ -18,6 +18,19 @@
     ticsRate(tRate),
     actuatorValues(NUM_ACTUATORS, 0.0)
  {
+
+    // Para que use sim_time
+    if (!this->has_parameter("use_sim_time")) {
+       this->declare_parameter("use_sim_time", true);
+    } else {
+       try {
+          this->set_parameter(rclcpp::Parameter("use_sim_time", true));
+       } catch (const rclcpp::exceptions::ParameterAlreadyDeclaredException &e) {
+          RCLCPP_WARN(this->get_logger(), "use_sim_time ya fue declarado");
+       }
+    }
+
+
     sensorValues.resize(NUM_RAYS * NUM_SONARS);
  
     prev_x = 0;
@@ -29,7 +42,6 @@
     this->get_parameter("scale_angular", a_scale_);
     this->get_parameter("scale_linear", l_scale_);
 
- 
     vel_pub_ = this->create_publisher<geometry_msgs::msg::Twist>("/cmd_vel", 10);
    // odom con QoS
    odom_sub_ = this->create_subscription<nav_msgs::msg::Odometry>(
@@ -111,26 +123,42 @@
     /*std_srvs::Empty gazeboParams;
       ros::service::call("/gazebo/reset_simulation", gazeboParams);*/
     while (!reset_sim_client_->wait_for_service(std::chrono::seconds(1))) {
-      RCLCPP_ERROR(this->get_logger(), "Prueba DENTRO DEL WHILE");
+      RCLCPP_ERROR(this->get_logger(), "No esta disponible, entro al while");
         if (!rclcpp::ok()) {
-            RCLCPP_ERROR(this->get_logger(), "Esperando /reset_simulation");
+            RCLCPP_WARN(this->get_logger(), "Esperando /reset_simulation");
             return arloState;
         }
-        RCLCPP_INFO(this->get_logger(), "Esperando servicio /reset_simulation...");
+        RCLCPP_INFO(this->get_logger(), "Sigue esperando /reset_simulation...");
     }
-    RCLCPP_ERROR(this->get_logger(), "Prueba FUERA DEL WHILE");
-    // crear solicitud 
+    RCLCPP_WARN(this->get_logger(), "/reset_simulation SI ESTA DISPONIBLE");
+    
+    // prueba del tiempo
+    bool sim_time = false;
+    this->get_parameter("use_sim_time", sim_time);
+    RCLCPP_INFO(this->get_logger(), "use_sim_time=%d", sim_time);
+
+
+    // crear solicitud al servicio reset_simulation
     auto reset_req = std::make_shared<std_srvs::srv::Empty::Request>();
+    RCLCPP_INFO(this->get_logger(), "Enviando solicitud al servicio /reset_simulation...");
+
     // llamar al servicio
     auto reset_future = reset_sim_client_->async_send_request(reset_req);
-    reset_future.wait();  // Esperar sin límite
-    try {
-       auto response = reset_future.get();
-       RCLCPP_INFO(this->get_logger(), "✅ Servicio /reset_simulation completado con éxito.");
-    } catch (const std::exception &e) {
-       RCLCPP_ERROR(this->get_logger(), "❌ Error al obtener la respuesta: %s", e.what());
-       return arloState;
-    }
+    // espera 15s a que el servicio responda 
+    auto status = reset_future.wait_for(std::chrono::seconds(15));
+    if (status == std::future_status::ready) {
+         try {
+            auto response = reset_future.get();
+            RCLCPP_INFO(this->get_logger(), "/reset_simulation FUNCIONA");
+         } catch (const std::exception &e) {
+            RCLCPP_ERROR(this->get_logger(), "Excepcion: %s", e.what());
+            return arloState;
+         }
+   } else {
+         RCLCPP_ERROR(this->get_logger(), "Pasaron los 15 segundos /reset_simulation FALLA");
+         RCLCPP_ERROR(this->get_logger(), "Estado del future: %d", static_cast<int>(status));
+         return arloState;
+  }
   
 
     maxSimTime = maxtime;

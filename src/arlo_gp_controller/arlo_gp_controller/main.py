@@ -9,11 +9,16 @@ from arlo_gp_controller.gp.gp import GeneticProgram
 from arlo_interfaces.srv import EvaluateTree
 from arlo_nn_controller.srv import EvaluateDriver
 
+from rclpy.executors import MultiThreadedExecutor
+
+
 import pickle
 
 def main():
     rclpy.init()
     node = Node('gp')
+    executor = MultiThreadedExecutor()
+    executor.add_node(node)
     
     print("Programa Genetico \n --------------------------------------\n")
     popSize = int(input("population size: "))
@@ -23,6 +28,7 @@ def main():
     gp = GeneticProgram(popSize, generations, treeDepth, 'full', mutationProbability)
     
     def handleEvaluateTree(request, response):
+        node.get_logger().info(f"Recibida solicitud para árbol {request.tree_index}")
         individual = None
         evalBest = True if request.tree_index == -1 else False
         if evalBest: 
@@ -57,21 +63,24 @@ def main():
             req = EvaluateDriver.Request()
             req.maxtime = 60
             req.tree_index = index
-            print("[GP] Enviando request → maxtime={request.maxtime}, tree_index={request.tree_index}")
+            print(f"[GP] Enviando request → maxtime={req.maxtime}, tree_index={req.tree_index}")
+            # prueba para el reset_simulation
             future = client.call_async(req)
-            rclpy.spin_until_future_complete(node, future)
-            
+            while not future.done():
+                node.get_logger().info("Esperando respuesta de evaluate_driver...")
+                executor.spin_once(timeout_sec=0.1)
+
             response = future.result()
             print(f"[GP] Respuesta recibida: dist2go={response.dist2go}")
-
+            gp.setAptitude(index, response.dist2go) 
             
-        gp.setAptitude(index, response.dist2go) 
         gp.setBestAptitud()
         gp.setBestParent()
         gp.setParents('torneo')
 
         if generation!= 0:  
             gp.sortParents()
+        
         aptitudPopulationAverage = sum(gp.aptitudes)/gp.popSize
         populationReport = ",{\nbestAptitud: "+str(gp.bestAptitud)+",\n"+"averageAptitud: "+str(aptitudPopulationAverage)+"\n}\n"
         f.write(populationReport)
@@ -88,7 +97,9 @@ def main():
     final_req.maxtime = 60
     final_req.tree_index = -1
     future = client.call_async(final_req)
-    rclpy.spin_until_future_complete(node, future)
+    while not future.done():
+        node.get_logger().info("MEJOR INDIVIDUO")
+        executor.spin_once(timeout_sec=0.1)
     
     f.close()
     with open ('gp.dat', 'wb') as gpFile:
