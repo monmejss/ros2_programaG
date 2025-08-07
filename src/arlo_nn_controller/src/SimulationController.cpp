@@ -123,19 +123,14 @@
     auto reset_req = std::make_shared<std_srvs::srv::Empty::Request>();
     // llamar al servicio
     auto reset_future = reset_sim_client_->async_send_request(reset_req);
-    auto status = reset_future.wait_for(std::chrono::seconds(15));
-    if (status == std::future_status::ready) {
-         try {
-            auto response = reset_future.get();  // <-- obtienes respuesta
-            RCLCPP_INFO(this->get_logger(), "✅ Servicio /reset_simulation ejecutado correctamente.");
-         } catch (const std::exception &e) {
-            RCLCPP_ERROR(this->get_logger(), "❌ Excepción al obtener la respuesta del servicio: %s", e.what());
-            return arloState;
-         }
-   } else {
-         RCLCPP_ERROR(this->get_logger(), "Fallo al llamar al servicio /reset_simulation (timeout).");
-         return arloState;
-  }
+    reset_future.wait();  // Esperar sin límite
+    try {
+       auto response = reset_future.get();
+       RCLCPP_INFO(this->get_logger(), "✅ Servicio /reset_simulation completado con éxito.");
+    } catch (const std::exception &e) {
+       RCLCPP_ERROR(this->get_logger(), "❌ Error al obtener la respuesta: %s", e.what());
+       return arloState;
+    }
   
 
     maxSimTime = maxtime;
