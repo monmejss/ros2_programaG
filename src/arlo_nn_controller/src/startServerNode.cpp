@@ -23,8 +23,11 @@
     outputRanges.push_back(std::make_pair(-0.5, 0.5));
 
     RCLCPP_INFO(sim->get_logger(), "Ready to evaluate Xolobot Drivers...");
+    
+    rclcpp::executors::MultiThreadedExecutor exec;
+    exec.add_node(sim);
+    exec.spin();
 
-    rclcpp::spin(sim);
     rclcpp::shutdown();
     return 0;
 }

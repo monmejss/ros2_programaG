@@ -23,6 +23,9 @@
 #include <vector>
 #include <iostream>
 
+#include <chrono>
+
+
 #define NUM_RAYS 32
 #define NUM_SONARS 3
 #define NUM_ACTUATORS 2
@@ -45,10 +48,10 @@ public:
 	int getNumSensors();
 	int getNumActuators();
     void actuatorCallback(const std_msgs::msg::Float32MultiArray::SharedPtr array);
-	bool evaluateDriver(
+	void evaluateDriver(
 		const std::shared_ptr<arlo_nn_controller::srv::EvaluateDriver::Request> req,
 		std::shared_ptr<arlo_nn_controller::srv::EvaluateDriver::Response> res);
-	
+
 
 private:
 	double dist2Go(double x, double y);
@@ -84,6 +87,10 @@ private:
 
 	vector<double> actuatorValues;
 	vector<double> sensorValues;
+
+	// para multihilos
+	rclcpp::CallbackGroup::SharedPtr service_mh_;
+	rclcpp::CallbackGroup::SharedPtr client_mh_;
 };
 
 #endif

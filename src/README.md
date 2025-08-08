@@ -8,3 +8,5 @@ generaciones: 40
 niveles:5
 mutacion: 0.1
 
+Para ver suscriptores
+ros2 topic info /cmd_vel
