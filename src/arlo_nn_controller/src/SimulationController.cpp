@@ -185,8 +185,7 @@
             RCLCPP_ERROR(this->get_logger(), "El servicio evaluate_tree NO RESPONDIO");
             actuatorValues[0] = actuatorValues[1] = 0.0;
         }
-
-        // Publicar velocidades
+        RCLCPP_INFO(this->get_logger(), "Publicar velocidades");
         linear_  = actuatorValues[0];
         angular_ = actuatorValues[1];
         geometry_msgs::msg::Twist twist;
@@ -196,6 +195,8 @@
 
         loop_rate.sleep();
     }
+    RCLCPP_INFO(this->get_logger(), "Salio de: ROS funciona, tiempo no se acabo, no ha cruzado la meta");
+
 
     // Resumen
     if (arloState.hasTimeRunOut) {
