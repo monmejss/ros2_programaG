@@ -11,6 +11,7 @@ from arlo_nn_controller.srv import EvaluateDriver
 
 from rclpy.executors import MultiThreadedExecutor
 
+import threading
 
 import pickle
 
@@ -28,22 +29,34 @@ def main():
     gp = GeneticProgram(popSize, generations, treeDepth, 'full', mutationProbability)
     
     def handleEvaluateTree(request, response):
-        node.get_logger().info(f"Recibida solicitud para árbol {request.tree_index}")
-        individual = None
-        evalBest = True if request.tree_index == -1 else False
-        if evalBest: 
-            individual = gp.bestParent
-        else:
-            individual = gp.population[request.tree_index]
+        try:
+            node.get_logger().info(f"Solicitud recibida para árbol {request.tree_index}")
+            individual = None
+            evalBest = True if request.tree_index == -1 else False
+            if evalBest: 
+                individual = gp.bestParent
+            else:
+                individual = gp.population[request.tree_index]
 
-        individual.setRosNode(node)
+            individual.setRosNode(node)
+            actuatorValues = individual.evaluateTree(request.sensor_values)
+            #print(f" Valores del actuador: {actuatorValues}")
+            response.actuator_values = list(actuatorValues)
+            return response
+        
+        except Exception as e:
+            node.get_logger().error(f"Excepción en handleEvaluateTree: {e}")
+            response.actuator_values = [0.0, 0.0]
+            return response
 
-        actuatorValues = individual.evaluateTree(request.sensor_values)
-        response.actuator_values = list(actuatorValues)
-        return response
-
+    # servidor del servicio evaluate_tree
     server = node.create_service(EvaluateTree, 'evaluate_tree', handleEvaluateTree)
     client = node.create_client(EvaluateDriver, 'evaluate_driver')
+    
+    # para que el nodo siga 
+    executor_thread = threading.Thread(target=executor.spin, daemon=True)
+    executor_thread.start()
+    
     while not client.wait_for_service(timeout_sec=1.0):
         node.get_logger().info('Esperando al servicio evaluate_driver...')
     
@@ -67,7 +80,7 @@ def main():
             # prueba para el reset_simulation
             future = client.call_async(req)
             while not future.done():
-                node.get_logger().info("Esperando respuesta de evaluate_driver...")
+                #node.get_logger().info("Esperando respuesta de evaluate_driver...")
                 executor.spin_once(timeout_sec=0.1)
 
             response = future.result()

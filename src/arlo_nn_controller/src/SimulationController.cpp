@@ -73,8 +73,9 @@
       std::bind(&SimulationController::evaluateDriver, this,
                   std::placeholders::_1, std::placeholders::_2));
 
-   
+    // Cliente de servicio de /evaluate_tree 
     actuatorClient_ = this->create_client<arlo_interfaces::srv::EvaluateTree>("evaluate_tree");
+    
     // Cliente de servicio de /reset_simulation 
     reset_sim_client_ = this->create_client<std_srvs::srv::Empty>("/reset_simulation");
     RCLCPP_INFO(this->get_logger(), "SimulationController inicializado");
@@ -143,24 +144,10 @@
     RCLCPP_INFO(this->get_logger(), "Enviando solicitud al servicio /reset_simulation...");
 
     // llamar al servicio
-    auto reset_future = reset_sim_client_->async_send_request(reset_req);
-    // espera 15s a que el servicio responda 
-    auto status = reset_future.wait_for(std::chrono::seconds(15));
-    if (status == std::future_status::ready) {
-         try {
-            auto response = reset_future.get();
-            RCLCPP_INFO(this->get_logger(), "/reset_simulation FUNCIONA");
-         } catch (const std::exception &e) {
-            RCLCPP_ERROR(this->get_logger(), "Excepcion: %s", e.what());
-            return arloState;
-         }
-   } else {
-         RCLCPP_ERROR(this->get_logger(), "Pasaron los 15 segundos /reset_simulation FALLA");
-         RCLCPP_ERROR(this->get_logger(), "Estado del future: %d", static_cast<int>(status));
-         return arloState;
-  }
+    reset_sim_client_->async_send_request(reset_req);
+    RCLCPP_INFO(this->get_logger(), "Solicitud enviada al servicio /reset_simulation...");
+    rclcpp::sleep_for(std::chrono::seconds(2));
   
-
     maxSimTime = maxtime;
     rclcpp::Rate loop_rate(50);
     linear_ = angular_ = 0;
@@ -168,29 +155,34 @@
     stuckCounter = 0;
 
     while (rclcpp::ok() && !arloState.hasTimeRunOut && !arloState.finishLineCrossed) {
+       RCLCPP_INFO(this->get_logger(), "ROS funciona, tiempo no se acabo, no ha cruzado la meta");
 
         // Esperar servicio evaluate_tree
         while (!actuatorClient_->wait_for_service(std::chrono::seconds(1))) {
             if (!rclcpp::ok()) {
-                RCLCPP_ERROR(this->get_logger(), "ROS apagándose mientras esperaba evaluate_tree");
+                RCLCPP_ERROR(this->get_logger(), "evaluate_tree murio");
                 return arloState;
             }
-            RCLCPP_WARN(this->get_logger(), "Esperando servicio evaluate_tree...");
+            RCLCPP_WARN(this->get_logger(), "Esperando a servicio evaluate_tree");
         }
 
         // Llamada a evaluate_tree
+        RCLCPP_INFO(this->get_logger(), "Paso a la llamada a evaluate_tree");
         auto eval_req = std::make_shared<arlo_interfaces::srv::EvaluateTree::Request>();
         for (int i = 0; i < NUM_RAYS; i++) {
-            eval_req->sensor_values[i] = sensorValues[i];
+         eval_req->sensor_values[i] = sensorValues[i];
         }
         eval_req->tree_index = tree_index;
-      // AQUI OTRO
+
+        RCLCPP_INFO(this->get_logger(), "Se enviara solicitud a servicio evaluate_tree");
         auto eval_future = actuatorClient_->async_send_request(eval_req);
         if (eval_future.wait_for(std::chrono::seconds(5)) == std::future_status::ready) {
+            RCLCPP_WARN(this->get_logger(), "El servicio evaluate_tree SI RESPONDIO");
             auto response = eval_future.get();
             actuatorValues[0] = response->actuator_values[0];
             actuatorValues[1] = response->actuator_values[1];
         } else {
+            RCLCPP_ERROR(this->get_logger(), "El servicio evaluate_tree NO RESPONDIO");
             actuatorValues[0] = actuatorValues[1] = 0.0;
         }
 

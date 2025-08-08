@@ -118,7 +118,7 @@ class Tree:
 
     
     def __evaluateTree(self, root:Node) -> float:
-        print("Evaluando nodo:", root.info, "| Terminal:", root.isTerminal())
+        #print("Evaluando nodo:", root.info, "| Terminal:", root.isTerminal())
 
         if root.isTerminal(): 
             return self.symTable[root.info]
